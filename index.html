@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Simple Rent Proration (30-day Month)</title>
+    <title>Simple Rent Proration Calculator</title>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -26,8 +26,9 @@
         display: block;
         margin-top: 6px;
       }
-      input[type="number"] {
-        width: 120px;
+      input[type="number"],
+      input[type="date"] {
+        width: 160px;
         padding: 4px;
         margin-top: 2px;
       }
@@ -51,10 +52,7 @@
   </head>
   <body>
     <h1>Simple Rent Proration Calculator</h1>
-    <p>
-      Daily rent is always calculated as monthly rent ÷ 30. Only show multiple
-      month options if the period crosses months.
-    </p>
+    <p>Daily rent is always calculated as monthly rent ÷ 30.</p>
 
     <!-- Check In Proportional -->
     <div class="section">
@@ -64,14 +62,17 @@
         <input type="number" id="ciRent" placeholder="e.g. 1500" />
       </label>
       <label
-        >From day (1 - 31):
-        <input type="number" id="ciFrom" min="1" max="31" />
+        >Start Date:
+        <input type="date" id="ciStart" />
       </label>
       <label
-        >To day (1 - 31):
-        <input type="number" id="ciTo" min="1" max="31" />
+        >End Date:
+        <input type="date" id="ciEnd" />
       </label>
-      <small>If To < From, it will be treated as next month.</small>
+      <small
+        >If the end date is before the start date, it will be treated as next
+        month.</small
+      >
       <br />
       <button onclick="calcCheckIn()">Calculate</button>
       <div id="ciResult" class="result"></div>
@@ -85,15 +86,15 @@
         <input type="number" id="eoRent" placeholder="e.g. 1500" />
       </label>
       <label
-        >From billing day (1 - 31):
-        <input type="number" id="eoFrom" min="1" max="31" />
+        >Start Date:
+        <input type="date" id="eoStart" />
       </label>
       <label
-        >Early check-out day (1 - 31):
-        <input type="number" id="eoTo" min="1" max="31" />
+        >End Date:
+        <input type="date" id="eoEnd" />
       </label>
       <small
-        >If check-out day < From day, the period will cross into the next
+        >If the end date is before the start date, it will be treated as next
         month.</small
       >
       <br />
@@ -102,40 +103,25 @@
     </div>
 
     <script>
-      function calcDaysCrossMonth(from, to, monthDays) {
-        if (to >= from) {
-          return to - from + 1;
-        } else {
-          // Adjust days if from is beyond the month length
-          if (from > monthDays) return null;
-          return monthDays - from + 1 + to;
+      function calculateDays(startDate, endDate) {
+        if (!startDate || !endDate) return null;
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+
+        // If end < start, assume next month/year
+        if (end < start) {
+          end.setMonth(end.getMonth() + 1);
         }
-      }
 
-      function formatMonthResults(rent, from, to) {
-        const daily = rent / 30;
-        const monthLengths = [
-          { label: "28-day", days: 28, maxFrom: 28 },
-          { label: "30-day", days: 30, maxFrom: 30 },
-          { label: "31-day", days: 31, maxFrom: 31 },
-        ];
-
-        let output = "";
-        monthLengths.forEach((month) => {
-          if (from > month.maxFrom) return; // skip if from day exceeds month
-          let days = calcDaysCrossMonth(from, to, month.days);
-          if (days === null) return; // skip invalid
-          let amount = daily * days;
-          output += `${month.label}: ${days} days → ${amount.toFixed(2)}   `;
-        });
-
-        return output;
+        const diffMs = end - start;
+        const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1; // inclusive
+        return days;
       }
 
       function calcCheckIn() {
         const rent = parseFloat(document.getElementById("ciRent").value);
-        const from = parseInt(document.getElementById("ciFrom").value, 10);
-        const to = parseInt(document.getElementById("ciTo").value, 10);
+        const startDate = document.getElementById("ciStart").value;
+        const endDate = document.getElementById("ciEnd").value;
         const resDiv = document.getElementById("ciResult");
         resDiv.textContent = "";
 
@@ -143,35 +129,28 @@
           resDiv.textContent = "Please enter a valid monthly rent.";
           return;
         }
-        if (isNaN(from) || isNaN(to)) {
-          resDiv.textContent = "Please enter valid From and To days.";
+
+        const days = calculateDays(startDate, endDate);
+        if (days === null) {
+          resDiv.textContent = "Please enter valid start and end dates.";
           return;
         }
 
         const daily = rent / 30;
-        let text = `Check In Proportional:\nMonthly Rent: ${rent.toFixed(
-          2
-        )}\nDaily Rent: ${daily.toFixed(
-          4
-        )}\nPeriod: day ${from} to day ${to}\n`;
+        const amount = daily * days;
 
-        if (to >= from) {
-          const days = to - from + 1;
-          const amount = days * daily;
-          text += `Number of days: ${days}\nProportional Amount: ${amount.toFixed(
-            2
-          )}`;
-        } else {
-          text += formatMonthResults(rent, from, to);
-        }
+        let text = `Check In Proportional:\n`;
+        text += `Daily Rent: ${daily.toFixed(2)}€\n`;
+        text += `Number of days: ${days}\n`;
+        text += `Proportional Amount: ${amount.toFixed(2)}€`;
 
         resDiv.textContent = text;
       }
 
       function calcEarlyOut() {
         const rent = parseFloat(document.getElementById("eoRent").value);
-        const from = parseInt(document.getElementById("eoFrom").value, 10);
-        const to = parseInt(document.getElementById("eoTo").value, 10);
+        const startDate = document.getElementById("eoStart").value;
+        const endDate = document.getElementById("eoEnd").value;
         const resDiv = document.getElementById("eoResult");
         resDiv.textContent = "";
 
@@ -179,27 +158,20 @@
           resDiv.textContent = "Please enter a valid monthly rent.";
           return;
         }
-        if (isNaN(from) || isNaN(to)) {
-          resDiv.textContent = "Please enter valid From and To days.";
+
+        const days = calculateDays(startDate, endDate);
+        if (days === null) {
+          resDiv.textContent = "Please enter valid start and end dates.";
           return;
         }
 
         const daily = rent / 30;
-        let text = `Early Check Out:\nMonthly Rent: ${rent.toFixed(
-          2
-        )}\nDaily Rent: ${daily.toFixed(
-          4
-        )}\nPeriod: day ${from} to day ${to}\n`;
+        const amount = daily * days;
 
-        if (to >= from) {
-          const days = to - from + 1;
-          const amount = days * daily;
-          text += `Number of days: ${days}\nProportional Amount: ${amount.toFixed(
-            2
-          )}`;
-        } else {
-          text += formatMonthResults(rent, from, to);
-        }
+        let text = `Early Check Out:\n`;
+        text += `Daily Rent: ${daily.toFixed(2)}€\n`;
+        text += `Number of days: ${days}\n`;
+        text += `Proportional Amount: ${amount.toFixed(2)}€`;
 
         resDiv.textContent = text;
       }
